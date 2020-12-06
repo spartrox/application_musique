@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:audioplayer2/audioplayer2.dart'; //package que l'on récupère sur le site pub.dev
 import 'package:volume/volume.dart'; //package que l'on récupère sur le site pub.dev
 import 'musique.dart'; //importation depuis le fichier lib/
-import 'package:flutter/services.dart';
 import 'dart:async';
 
 void main() {
@@ -34,7 +33,7 @@ class _Home extends State<Home> {
         'musiques/Kendji-Girac.mp3'),
     new Musique(
         'Trop beau', 'LOMEPAL', 'images/image2.jpg', 'musiques/lomepa.mp3'),
-    new Musique('Longtemps', 'AMIR', 'images/image3.jpg', 'musiques/amir.mp3'),
+    new Musique('Longtemps', 'AMIR', 'images/image3.png', 'musiques/amir.mp3'),
   ];
 
   AudioPlayer audioPlayer;
@@ -49,16 +48,20 @@ class _Home extends State<Home> {
   bool mute = false;
   int maxVol = 0, currentVol = 0;
 
+  // Permet d'initialiser l'application
   @override
   void initState() {
-    // Permet d'initialiser l'application
     super.initState();
     actualMusique = musiqueListe[index];
     configAudioPlayer();
+    initPlatformState();
+    updateVolume();
   }
 
   @override
   Widget build(BuildContext context) {
+    double largeur = MediaQuery.of(context).size.width;
+    //int nawVol = getVolumePourcent().toInt();
     return Scaffold(
       appBar: AppBar(
         title: new Text("Application de musique"),
@@ -79,23 +82,112 @@ class _Home extends State<Home> {
             new Container(
               margin: EdgeInsets.only(top: 20),
               child: new Text(
-                actualMusique.titre,
-                textScaleFactor: 2,
+                actualMusique.titre, // Récupere le titre de la musique
+                textScaleFactor: 2, // Modifier la taille du texte
+                style: new TextStyle(color: Colors.white),
               ),
             ),
             new Container(
               margin: EdgeInsets.only(top: 10),
               child: new Text(
-                actualMusique.auteur,
+                actualMusique.auteur, // Récupere le nom de l'auteur
                 textScaleFactor: 1.5,
+                style: new TextStyle(
+                  color: Colors.white,
+                ),
               ),
             ),
+            new Container(
+              height: largeur / 5,
+              margin: EdgeInsets.only(left: 10, right: 10),
+              child: new Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  new IconButton(
+                      icon: new Icon(Icons.fast_rewind), onPressed: rewind),
+                  new IconButton(
+                      icon: (statut != PlayerState.PLAYING)
+                          ? new Icon(Icons.play_arrow)
+                          : new Icon(Icons.pause),
+                      onPressed: (statut != PlayerState.PLAYING) ? play : pause,
+                      iconSize: 50),
+                  new IconButton(
+                      icon: (mute)
+                          ? new Icon(Icons.headset_off)
+                          : new Icon(Icons.headset),
+                      onPressed: muted),
+                  new IconButton(
+                      icon: new Icon(Icons.fast_forward), onPressed: forward),
+                ],
+              ),
+            )
           ],
         ),
       ),
     );
   }
 
+// POUR TOUTES LES CHOSES CREE APRES, JE ME SUIS AIDE ET J'AI RECUPERE UN PLUGIN :
+// https://pub.dev/packages/volume
+
+  // Pourcentage du volume sur 100
+  double getVolumePourcent() {
+    return (currentVol / maxVol) * 100;
+  }
+
+  //Initialiser le volume
+  Future initPlatformState() async {
+    //On choisit Stream Music pour bien montrer que l'on veut modifier le volume de la musique et pas de la sonnerie par exemple
+    await Volume.controlVolume(AudioManager.STREAM_MUSIC);
+  }
+
+  // Update le volume
+  updateVolume() async {
+    maxVol = await Volume.getMaxVol;
+    currentVol = await Volume.getVol;
+    setState(() {});
+  }
+
+  // Définir le volume
+  setVol(int i) async {
+    await Volume.setVol(i);
+  }
+
+  // Gestion des textes avec styles
+  Text textWithStyle(String data, double scale) {
+    return new Text(data,
+        textScaleFactor: scale,
+        textAlign: TextAlign.center,
+        style: new TextStyle(color: Colors.black, fontSize: 15.0));
+  }
+
+  // Gestion des Boutons
+  IconButton bouton(IconData icone, double taille, ActionMusique action) {
+    return new IconButton(
+        icon: new Icon(icone),
+        iconSize: taille,
+        color: Colors.white,
+        onPressed: () {
+          switch (action) {
+            case ActionMusique.PLAY:
+              play();
+              break;
+            case ActionMusique.PAUSE:
+              pause();
+              break;
+            case ActionMusique.REWIND:
+              rewind();
+              break;
+            case ActionMusique.FORWARD:
+              forward();
+              break;
+            default:
+              break;
+          }
+        });
+  }
+
+  // Configuration de l'AudioPlayer
   void configAudioPlayer() {
     audioPlayer = new AudioPlayer();
     positionSubscription = audioPlayer.onAudioPositionChanged.listen((pos) {
@@ -107,6 +199,7 @@ class _Home extends State<Home> {
         position = new Duration(seconds: 0); // Passer à la musique suivante
       }
     });
+
     StateSubscription = audioPlayer.onPlayerStateChanged.listen((state) {
       if (state == AudioPlayerState.PLAYING) {
         setState(() {
@@ -165,6 +258,10 @@ class _Home extends State<Home> {
       } else {
         index--;
       }
+      actualMusique = musiqueListe[index];
+      audioPlayer.stop();
+      configAudioPlayer();
+      play();
     }
   }
 
